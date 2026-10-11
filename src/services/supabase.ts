@@ -113,6 +113,23 @@ export interface SupportTicket {
   updated_at: string;
 }
 
+export interface NotificationMetrics {
+  viewed_count: number;
+  read_count: number;
+  viewed_pct: number;
+  read_pct: number;
+  total_events: number;
+}
+
+export interface NotificationAnalytics {
+  total_installations: number;
+  global_viewed_count: number;
+  global_read_count: number;
+  global_viewed_pct: number;
+  global_read_pct: number;
+  by_notification: Record<string, NotificationMetrics>;
+}
+
 export interface AppNotification {
   id: number;
   title: string;
@@ -126,6 +143,10 @@ export interface AppNotification {
   author_email?: string | null;
   created_at: string;
   expires_at?: string | null;
+  viewed_count?: number;
+  read_count?: number;
+  viewed_pct?: number;
+  read_pct?: number;
 }
 
 export interface CreateNotificationInput {
@@ -734,11 +755,117 @@ export async function updateTicketStatus(
 }
 
 /**
- * Busca todas as notificações cadastradas
+ * Busca estatísticas analíticas consolidadas de visualização e leitura das notificações
+ */
+export async function getNotificationAnalytics(): Promise<NotificationAnalytics> {
+  try {
+    const data = await fetchFromSupabase("rpc/get_notification_analytics", {
+      method: "POST",
+    });
+    if (data && typeof data === "object" && data.total_installations !== undefined) {
+      return data as NotificationAnalytics;
+    }
+  } catch (err) {
+    console.warn("Falha ao chamar rpc/get_notification_analytics, usando fallback local:", err);
+  }
+
+  // Fallback seguro caso a RPC não esteja acessível
+  try {
+    const [installations, events] = await Promise.all([
+      fetchFromSupabase("telemetry_installations?select=installation_id").catch(() => []),
+      fetchFromSupabase("telemetry_events?event_name=in.(notification_viewed,notification_read)&select=event_name,installation_id,event_data&limit=5000").catch(() => []),
+    ]);
+
+    const instSet = new Set<string>();
+    for (const inst of installations || []) {
+      if (inst.installation_id) instSet.add(inst.installation_id);
+    }
+    for (const ev of events || []) {
+      if (ev.installation_id) instSet.add(ev.installation_id);
+    }
+    const totalInst = Math.max(1, instSet.size);
+
+    const globalViewedSet = new Set<string>();
+    const globalReadSet = new Set<string>();
+    const byNotifMap: Record<string, { viewed: Set<string>; read: Set<string>; count: number }> = {};
+
+    for (const ev of events || []) {
+      const notifId = String(ev.event_data?.notification_id || "");
+      if (!notifId) continue;
+
+      if (!byNotifMap[notifId]) {
+        byNotifMap[notifId] = { viewed: new Set(), read: new Set(), count: 0 };
+      }
+      byNotifMap[notifId].count++;
+
+      if (ev.event_name === "notification_viewed" && ev.installation_id) {
+        globalViewedSet.add(ev.installation_id);
+        byNotifMap[notifId].viewed.add(ev.installation_id);
+      } else if (ev.event_name === "notification_read" && ev.installation_id) {
+        globalReadSet.add(ev.installation_id);
+        byNotifMap[notifId].read.add(ev.installation_id);
+      }
+    }
+
+    const byNotification: Record<string, NotificationMetrics> = {};
+    for (const [id, stats] of Object.entries(byNotifMap)) {
+      byNotification[id] = {
+        viewed_count: stats.viewed.size,
+        read_count: stats.read.size,
+        viewed_pct: Math.round((stats.viewed.size / totalInst) * 100),
+        read_pct: Math.round((stats.read.size / totalInst) * 100),
+        total_events: stats.count,
+      };
+    }
+
+    return {
+      total_installations: totalInst,
+      global_viewed_count: globalViewedSet.size,
+      global_read_count: globalReadSet.size,
+      global_viewed_pct: Math.round((globalViewedSet.size / totalInst) * 100),
+      global_read_pct: Math.round((globalReadSet.size / totalInst) * 100),
+      by_notification: byNotification,
+    };
+  } catch {
+    return {
+      total_installations: 1,
+      global_viewed_count: 0,
+      global_read_count: 0,
+      global_viewed_pct: 0,
+      global_read_pct: 0,
+      by_notification: {},
+    };
+  }
+}
+
+/**
+ * Busca todas as notificações cadastradas com métricas de alcance e leitura associadas
  */
 export async function getAppNotifications(): Promise<AppNotification[]> {
   try {
-    return await fetchFromSupabase("app_notifications?select=*&order=created_at.desc&limit=150");
+    const [rawNotifications, analytics] = await Promise.all([
+      fetchFromSupabase("app_notifications?select=*&order=created_at.desc&limit=150"),
+      getNotificationAnalytics().catch(() => null),
+    ]);
+
+    const notifs: AppNotification[] = Array.isArray(rawNotifications) ? rawNotifications : [];
+    if (analytics && analytics.by_notification) {
+      for (const n of notifs) {
+        const stats = analytics.by_notification[String(n.id)];
+        if (stats) {
+          n.viewed_count = stats.viewed_count || 0;
+          n.read_count = stats.read_count || 0;
+          n.viewed_pct = stats.viewed_pct || 0;
+          n.read_pct = stats.read_pct || 0;
+        } else {
+          n.viewed_count = 0;
+          n.read_count = 0;
+          n.viewed_pct = 0;
+          n.read_pct = 0;
+        }
+      }
+    }
+    return notifs;
   } catch (err) {
     console.warn("Falha ao buscar notificações:", err);
     return [];
@@ -828,16 +955,34 @@ export async function toggleNotificationActive(id: number, isActive: boolean): P
 }
 
 /**
- * Exclui uma notificação do banco
+ * Exclui uma notificação do banco e remove todos os eventos de visualização e leitura vinculados
  */
 export async function deleteAppNotification(id: number): Promise<boolean> {
   try {
+    // 1. Remove os eventos de visualização e leitura vinculados a esta notificação no telemetry_events
+    try {
+      await Promise.all([
+        fetchFromSupabase(
+          `telemetry_events?event_name=in.(notification_viewed,notification_read)&event_data->>notification_id=eq.${id}`,
+          { method: "DELETE" }
+        ),
+        fetchFromSupabase(
+          `telemetry_events?event_name=in.(notification_viewed,notification_read)&event_data->>id=eq.${id}`,
+          { method: "DELETE" }
+        ),
+      ]);
+    } catch (errEv) {
+      console.warn("Aviso ao limpar eventos da notificação excluída:", errEv);
+    }
+
+    // 2. Exclui a notificação da tabela app_notifications
     await fetchFromSupabase(`app_notifications?id=eq.${id}`, {
       method: "DELETE",
       headers: {
         Prefer: "return=representation",
       },
     });
+
     return true;
   } catch (err) {
     console.error("Erro ao excluir notificação:", err);

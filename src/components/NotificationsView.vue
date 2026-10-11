@@ -45,6 +45,7 @@
 
     <!-- 2. Cards de Métricas / KPIs de Notificações -->
     <div class="kpi-grid">
+      <!-- Card 1: Total Criadas -->
       <div class="card-box kpi-card">
         <div class="kpi-head">
           <span class="kpi-label">Total Criadas</span>
@@ -56,40 +57,13 @@
           </span>
         </div>
         <span class="kpi-number font-mono">{{ notifications.length }}</span>
-        <span class="kpi-foot">Notificações no histórico</span>
+        <span class="kpi-foot">{{ activeCount }} ativas • {{ inactiveCount }} pausadas</span>
       </div>
 
+      <!-- Card 2: Programas Instalados -->
       <div class="card-box kpi-card">
         <div class="kpi-head">
-          <span class="kpi-label">Ativas Agora</span>
-          <span class="kpi-icon-wrap bg-green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </span>
-        </div>
-        <span class="kpi-number font-mono">{{ activeCount }}</span>
-        <span class="kpi-foot">Exibidas no aplicativo</span>
-      </div>
-
-      <div class="card-box kpi-card">
-        <div class="kpi-head">
-          <span class="kpi-label">Pausadas / Inativas</span>
-          <span class="kpi-icon-wrap bg-gray">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="6" y="4" width="4" height="16"/>
-              <rect x="14" y="4" width="4" height="16"/>
-            </svg>
-          </span>
-        </div>
-        <span class="kpi-number font-mono">{{ inactiveCount }}</span>
-        <span class="kpi-foot">Ocultas para os usuários</span>
-      </div>
-
-      <div class="card-box kpi-card">
-        <div class="kpi-head">
-          <span class="kpi-label">Público Estimado</span>
+          <span class="kpi-label">Programas Instalados</span>
           <span class="kpi-icon-wrap bg-purple">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="3" width="20" height="14" rx="2"/>
@@ -98,8 +72,45 @@
             </svg>
           </span>
         </div>
-        <span class="kpi-number font-mono">100%</span>
-        <span class="kpi-foot">Dispositivos Louvor JA</span>
+        <span class="kpi-number font-mono">{{ analytics.total_installations }}</span>
+        <span class="kpi-foot">Base total de instalações</span>
+      </div>
+
+      <!-- Card 3: Alcance Geral (Visualizações) -->
+      <div class="card-box kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Alcance Geral (Viram)</span>
+          <span class="kpi-icon-wrap bg-cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-number-row">
+          <span class="kpi-number font-mono">{{ analytics.global_viewed_pct }}%</span>
+          <span class="kpi-fraction font-mono">{{ analytics.global_viewed_count }}/{{ analytics.total_installations }}</span>
+        </div>
+        <span class="kpi-foot">Instalações viram as notificações</span>
+      </div>
+
+      <!-- Card 4: Engajamento Geral (Leituras) -->
+      <div class="card-box kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Leituras (Leram)</span>
+          <span class="kpi-icon-wrap bg-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              <polyline points="9 9 12 12 16 8"/>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-number-row">
+          <span class="kpi-number font-mono">{{ analytics.global_read_pct }}%</span>
+          <span class="kpi-fraction font-mono">{{ analytics.global_read_count }}/{{ analytics.total_installations }}</span>
+        </div>
+        <span class="kpi-foot">Instalações abriram e leram</span>
       </div>
     </div>
 
@@ -279,6 +290,48 @@
                     <line x1="10" y1="14" x2="21" y2="3"/>
                   </svg>
                 </a>
+              </div>
+            </div>
+
+            <!-- Painel de Alcance e Leitura Individual -->
+            <div class="notif-metrics-panel">
+              <div class="metric-block">
+                <div class="metric-top">
+                  <div class="metric-title-group">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon text-cyan">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <span class="metric-name">Visualizações (Viram):</span>
+                  </div>
+                  <div class="metric-stat-group font-mono">
+                    <span class="metric-count">{{ item.viewed_count || 0 }} de {{ analytics.total_installations }}</span>
+                    <span class="metric-badge badge-cyan">{{ item.viewed_pct || 0 }}%</span>
+                  </div>
+                </div>
+                <div class="metric-bar-bg">
+                  <div class="metric-bar-fill fill-cyan" :style="{ width: `${item.viewed_pct || 0}%` }"></div>
+                </div>
+              </div>
+
+              <div class="metric-block">
+                <div class="metric-top">
+                  <div class="metric-title-group">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon text-green">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                      <polyline points="9 9 12 12 16 8"/>
+                    </svg>
+                    <span class="metric-name">Leituras (Leram):</span>
+                  </div>
+                  <div class="metric-stat-group font-mono">
+                    <span class="metric-count">{{ item.read_count || 0 }} de {{ analytics.total_installations }}</span>
+                    <span class="metric-badge badge-green">{{ item.read_pct || 0 }}%</span>
+                  </div>
+                </div>
+                <div class="metric-bar-bg">
+                  <div class="metric-bar-fill fill-green" :style="{ width: `${item.read_pct || 0}%` }"></div>
+                </div>
               </div>
             </div>
 
@@ -517,11 +570,13 @@
 import { ref, computed, onMounted, watch, reactive } from "vue";
 import {
   getAppNotifications,
+  getNotificationAnalytics,
   createAppNotification,
   updateAppNotification,
   toggleNotificationActive,
   deleteAppNotification,
   type AppNotification,
+  type NotificationAnalytics,
   type CreateNotificationInput,
 } from "../services/supabase";
 
@@ -534,6 +589,14 @@ const emit = defineEmits<{
 }>();
 
 const notifications = ref<AppNotification[]>([]);
+const analytics = ref<NotificationAnalytics>({
+  total_installations: 1,
+  global_viewed_count: 0,
+  global_read_count: 0,
+  global_viewed_pct: 0,
+  global_read_pct: 0,
+  by_notification: {},
+});
 const loading = ref(false);
 const saving = ref(false);
 
@@ -596,8 +659,14 @@ const filteredNotifications = computed(() => {
 async function loadNotifications(showFeedback = false) {
   loading.value = true;
   try {
-    const data = await getAppNotifications();
+    const [data, an] = await Promise.all([
+      getAppNotifications(),
+      getNotificationAnalytics(),
+    ]);
     notifications.value = data;
+    if (an) {
+      analytics.value = an;
+    }
     emit("update-active-count", activeCount.value);
     if (showFeedback) {
       showToast("Notificações sincronizadas com sucesso!");
@@ -715,7 +784,8 @@ async function confirmDelete(item: AppNotification) {
     if (ok) {
       notifications.value = notifications.value.filter((n) => n.id !== item.id);
       emit("update-active-count", activeCount.value);
-      showToast("Notificação removida com sucesso.");
+      showToast("Notificação e histórico de visualizações removidos.");
+      await loadNotifications();
     } else {
       showToast("Erro ao excluir notificação.", "error");
     }
@@ -912,6 +982,19 @@ onMounted(() => {
 .bg-green { background: var(--success-light); color: var(--success); }
 .bg-gray { background: var(--bg-card-subtle); color: var(--text-muted); }
 .bg-purple { background: var(--purple-light); color: var(--purple); }
+.bg-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+
+.kpi-number-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kpi-fraction {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
 
 .kpi-number {
   font-size: 1.6rem;
@@ -1287,6 +1370,105 @@ onMounted(() => {
 .link-ext-svg {
   width: 12px;
   height: 12px;
+}
+
+/* Painel de Métricas de Visualização e Leitura */
+.notif-metrics-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .notif-metrics-panel {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.metric-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+}
+
+.metric-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.metric-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.text-cyan { color: #06b6d4; }
+.text-green { color: var(--success); }
+
+.metric-stat-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-count {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.metric-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+.badge-cyan {
+  background: rgba(6, 182, 212, 0.16);
+  color: #06b6d4;
+}
+
+.badge-green {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.metric-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: var(--border-light);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.fill-cyan {
+  background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+}
+
+.fill-green {
+  background: linear-gradient(90deg, #10b981, #059669);
 }
 
 /* Rodapé do Card */
