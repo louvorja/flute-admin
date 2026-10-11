@@ -95,7 +95,7 @@
         <div class="side-metric-item">
           <span class="side-label">Total de Músicas</span>
           <div class="side-val font-mono">{{ (totalSongs || 0).toLocaleString('pt-BR') }}</div>
-          <span class="side-growth" :class="totalSongs > 0 ? 'text-success' : 'text-muted'">
+          <span class="side-growth" :class="totalSongs > 0 ? 'text-primary' : 'text-muted'">
             {{ totalSongs > 0 ? `↗ ${totalSongs} execuções ${periodGrowthText}` : 'Nenhuma música tocada no período' }}
           </span>
         </div>
@@ -103,7 +103,7 @@
         <div class="side-metric-item">
           <span class="side-label">Slides Projetados</span>
           <div class="side-val font-mono">{{ (totalSlides || 0).toLocaleString('pt-BR') }}</div>
-          <span class="side-growth" :class="totalSlides > 0 ? 'text-info' : 'text-muted'">
+          <span class="side-growth" :class="totalSlides > 0 ? 'text-success' : 'text-muted'">
             {{ totalSlides > 0 ? `↗ ${totalSlides} projeções ${periodGrowthText}` : 'Nenhum slide projetado no período' }}
           </span>
         </div>
@@ -111,7 +111,7 @@
         <div class="side-metric-item">
           <span class="side-label">Dispositivos Únicos</span>
           <div class="side-val font-mono">{{ (totalDevices || 0).toLocaleString('pt-BR') }}</div>
-          <span class="side-growth" :class="totalDevices > 0 ? 'text-success' : 'text-muted'">
+          <span class="side-growth" :class="totalDevices > 0 ? 'text-warning' : 'text-muted'">
             {{ totalDevices > 0 ? `↗ ${totalDevices} dispositivo(s) ${periodGrowthText}` : 'Nenhum dispositivo ativo' }}
           </span>
         </div>
@@ -288,7 +288,7 @@ const chartData = computed(() => {
 }
 
 .dot-slides {
-  background: var(--info);
+  background: var(--success);
 }
 
 .dot-sessions {
@@ -361,25 +361,26 @@ const chartData = computed(() => {
   transition: height 0.4s ease;
 }
 
+/* Cores sincronizadas com a legenda e tooltip:
+   - Slides: Verde Esmeralda (var(--success))
+   - Músicas: Azul Louvor JA (var(--primary))
+   - Inicializações / Sessões: Âmbar (var(--warning))
+*/
 .seg-slides {
-  background: #0097d7;
+  background: var(--success);
 }
 
 .seg-music {
-  background: #38bdf8;
-  opacity: 0.9;
-}
-
-.bar-column.highlighted .seg-slides {
-  background: #10b981;
-}
-
-.bar-column.highlighted .seg-music {
-  background: #34d399;
+  background: var(--primary);
 }
 
 .seg-base {
-  background: #f59e0b;
+  background: var(--warning);
+}
+
+.bar-column:hover .bar-segment,
+.bar-column.highlighted .bar-segment {
+  filter: brightness(1.12);
 }
 
 .bar-label {

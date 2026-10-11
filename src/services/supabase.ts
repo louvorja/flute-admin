@@ -123,6 +123,9 @@ export interface NotificationMetrics {
 
 export interface NotificationAnalytics {
   total_installations: number;
+  total_notifications?: number;
+  active_notifications?: number;
+  total_opportunities?: number;
   global_viewed_count: number;
   global_read_count: number;
   global_viewed_pct: number;
@@ -139,6 +142,9 @@ export interface AppNotification {
   target_audience: "all" | "windows" | "mac" | "linux";
   link_url?: string | null;
   link_label?: string | null;
+  action_module?: string | null;
+  action_label?: string | null;
+  action_params?: string | null;
   is_active: boolean;
   author_email?: string | null;
   created_at: string;
@@ -157,6 +163,9 @@ export interface CreateNotificationInput {
   target_audience?: "all" | "windows" | "mac" | "linux";
   link_url?: string | null;
   link_label?: string | null;
+  action_module?: string | null;
+  action_label?: string | null;
+  action_params?: string | null;
   is_active?: boolean;
   expires_at?: string | null;
   author_email?: string | null;
@@ -771,9 +780,10 @@ export async function getNotificationAnalytics(): Promise<NotificationAnalytics>
 
   // Fallback seguro caso a RPC não esteja acessível
   try {
-    const [installations, events] = await Promise.all([
+    const [installations, events, notifs] = await Promise.all([
       fetchFromSupabase("telemetry_installations?select=installation_id").catch(() => []),
       fetchFromSupabase("telemetry_events?event_name=in.(notification_viewed,notification_read)&select=event_name,installation_id,event_data&limit=5000").catch(() => []),
+      fetchFromSupabase("app_notifications?select=id,is_active").catch(() => []),
     ]);
 
     const instSet = new Set<string>();
@@ -785,12 +795,10 @@ export async function getNotificationAnalytics(): Promise<NotificationAnalytics>
     }
     const totalInst = Math.max(1, instSet.size);
 
-    const globalViewedSet = new Set<string>();
-    const globalReadSet = new Set<string>();
     const byNotifMap: Record<string, { viewed: Set<string>; read: Set<string>; count: number }> = {};
 
     for (const ev of events || []) {
-      const notifId = String(ev.event_data?.notification_id || "");
+      const notifId = String(ev.event_data?.notification_id || ev.event_data?.id || "");
       if (!notifId) continue;
 
       if (!byNotifMap[notifId]) {
@@ -799,10 +807,8 @@ export async function getNotificationAnalytics(): Promise<NotificationAnalytics>
       byNotifMap[notifId].count++;
 
       if (ev.event_name === "notification_viewed" && ev.installation_id) {
-        globalViewedSet.add(ev.installation_id);
         byNotifMap[notifId].viewed.add(ev.installation_id);
       } else if (ev.event_name === "notification_read" && ev.installation_id) {
-        globalReadSet.add(ev.installation_id);
         byNotifMap[notifId].read.add(ev.installation_id);
       }
     }
@@ -818,17 +824,39 @@ export async function getNotificationAnalytics(): Promise<NotificationAnalytics>
       };
     }
 
+    const notifList = Array.isArray(notifs) ? notifs : [];
+    const activeList = notifList.filter((n: any) => n.is_active);
+    const targetList = activeList.length > 0 ? activeList : notifList;
+    const targetCount = Math.max(1, targetList.length);
+    const totalOpp = targetCount * totalInst;
+
+    let sumViewed = 0;
+    let sumRead = 0;
+    for (const n of targetList) {
+      const stats = byNotification[String(n.id)];
+      if (stats) {
+        sumViewed += stats.viewed_count;
+        sumRead += stats.read_count;
+      }
+    }
+
     return {
       total_installations: totalInst,
-      global_viewed_count: globalViewedSet.size,
-      global_read_count: globalReadSet.size,
-      global_viewed_pct: Math.round((globalViewedSet.size / totalInst) * 100),
-      global_read_pct: Math.round((globalReadSet.size / totalInst) * 100),
+      total_notifications: notifList.length,
+      active_notifications: activeList.length,
+      total_opportunities: totalOpp,
+      global_viewed_count: sumViewed,
+      global_read_count: sumRead,
+      global_viewed_pct: Math.round((sumViewed / totalOpp) * 100),
+      global_read_pct: Math.round((sumRead / totalOpp) * 100),
       by_notification: byNotification,
     };
   } catch {
     return {
       total_installations: 1,
+      total_notifications: 0,
+      active_notifications: 0,
+      total_opportunities: 1,
       global_viewed_count: 0,
       global_read_count: 0,
       global_viewed_pct: 0,
@@ -890,6 +918,9 @@ export async function createAppNotification(input: CreateNotificationInput): Pro
         target_audience: input.target_audience || "all",
         link_url: input.link_url?.trim() || null,
         link_label: input.link_label?.trim() || null,
+        action_module: input.action_module?.trim() || null,
+        action_label: input.action_label?.trim() || null,
+        action_params: input.action_params?.trim() || null,
         is_active: input.is_active !== undefined ? input.is_active : true,
         expires_at: input.expires_at || null,
         author_email: input.author_email || getCurrentUser()?.email || null,
@@ -918,6 +949,9 @@ export async function updateAppNotification(
     if (input.target_audience !== undefined) payload.target_audience = input.target_audience;
     if (input.link_url !== undefined) payload.link_url = input.link_url?.trim() || null;
     if (input.link_label !== undefined) payload.link_label = input.link_label?.trim() || null;
+    if (input.action_module !== undefined) payload.action_module = input.action_module?.trim() || null;
+    if (input.action_label !== undefined) payload.action_label = input.action_label?.trim() || null;
+    if (input.action_params !== undefined) payload.action_params = input.action_params?.trim() || null;
     if (input.is_active !== undefined) payload.is_active = input.is_active;
     if (input.expires_at !== undefined) payload.expires_at = input.expires_at || null;
 
@@ -1688,9 +1722,9 @@ function calculateBarPercentages(items: WeeklyDayData[]): WeeklyDayData[] {
       const mRatio = d.music / total;
       const sRatio = d.slides / total;
       const bRatio = (d.desktop + d.web) / total;
-      d.slidesPct = Math.max(8, Math.round(scale * sRatio));
-      d.musicPct = Math.max(8, Math.round(scale * mRatio));
-      d.basePct = Math.max(6, Math.round(scale * bRatio));
+      d.slidesPct = d.slides > 0 ? Math.max(6, Math.round(scale * sRatio)) : 0;
+      d.musicPct = d.music > 0 ? Math.max(6, Math.round(scale * mRatio)) : 0;
+      d.basePct = (d.desktop + d.web) > 0 ? Math.max(5, Math.round(scale * bRatio)) : 0;
     } else {
       d.slidesPct = 0;
       d.musicPct = 0;

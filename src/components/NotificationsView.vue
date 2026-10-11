@@ -88,10 +88,10 @@
           </span>
         </div>
         <div class="kpi-number-row">
-          <span class="kpi-number font-mono">{{ analytics.global_viewed_pct }}%</span>
-          <span class="kpi-fraction font-mono">{{ analytics.global_viewed_count }}/{{ analytics.total_installations }}</span>
+          <span class="kpi-number font-mono">{{ globalViewedStats.pct }}%</span>
+          <span class="kpi-fraction font-mono">{{ globalViewedStats.fraction }}</span>
         </div>
-        <span class="kpi-foot">Instalações viram as notificações</span>
+        <span class="kpi-foot">{{ globalViewedStats.foot }}</span>
       </div>
 
       <!-- Card 4: Engajamento Geral (Leituras) -->
@@ -107,10 +107,10 @@
           </span>
         </div>
         <div class="kpi-number-row">
-          <span class="kpi-number font-mono">{{ analytics.global_read_pct }}%</span>
-          <span class="kpi-fraction font-mono">{{ analytics.global_read_count }}/{{ analytics.total_installations }}</span>
+          <span class="kpi-number font-mono">{{ globalReadStats.pct }}%</span>
+          <span class="kpi-fraction font-mono">{{ globalReadStats.fraction }}</span>
         </div>
-        <span class="kpi-foot">Instalações abriram e leram</span>
+        <span class="kpi-foot">{{ globalReadStats.foot }}</span>
       </div>
     </div>
 
@@ -275,9 +275,21 @@
             <div class="notif-body">
               <p class="notif-message-text">{{ item.message }}</p>
 
-              <!-- Botão de Ação / Link Externo se configurado -->
-              <div v-if="item.link_url" class="notif-action-link-wrap">
+              <!-- Ações Vinculadas: Módulo Interno do App e/ou Link Externo -->
+              <div v-if="item.action_module || item.link_url" class="notif-actions-wrap">
+                <!-- Ação Interna do Louvor JA -->
+                <div v-if="item.action_module" class="action-module-chip font-mono" :title="`Ao clicar no Louvor JA, abre o módulo: ${item.action_module}`">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-chip-svg">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>Módulo App: <strong>{{ item.action_label || getModuleDefaultLabel(item.action_module) }}</strong> ({{ item.action_module }})</span>
+                </div>
+
+                <!-- Botão de Ação / Link Externo se configurado -->
                 <a
+                  v-if="item.link_url"
                   :href="item.link_url"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -468,26 +480,75 @@
               <span class="form-hint font-mono">{{ form.message.length }} caracteres</span>
             </div>
 
-            <!-- Link de Ação (URL) -->
+            <!-- Ação no Louvor JA (Módulo Interno) -->
+            <div class="form-group full-width">
+              <label class="form-label" for="notif-module">
+                Ação no Louvor JA (Módulo / Tela Interna - Opcional)
+              </label>
+              <select id="notif-module" v-model="form.action_module" class="form-select">
+                <option :value="null">Nenhuma ação interna (Padrão)</option>
+                <option
+                  v-for="mod in MODULE_OPTIONS"
+                  :key="mod.id"
+                  :value="mod.id"
+                >
+                  {{ mod.name }} ({{ mod.id }})
+                </option>
+              </select>
+              <span class="form-hint">
+                Se selecionado, o app exibirá um botão temático que abre a tela diretamente e marca o comunicado como lido.
+              </span>
+            </div>
+
+            <!-- Texto do Botão do Módulo -->
+            <div v-if="form.action_module" class="form-group">
+              <label class="form-label" for="notif-action-label">Texto do Botão do Módulo</label>
+              <input
+                id="notif-action-label"
+                v-model="form.action_label"
+                type="text"
+                :placeholder="`Ex: ${getModuleDefaultLabel(form.action_module)}`"
+                class="form-input"
+              />
+              <span class="form-hint">
+                Deixe em branco para usar o texto automático padrão: "{{ getModuleDefaultLabel(form.action_module) }}".
+              </span>
+            </div>
+
+            <!-- Parâmetros Adicionais do Módulo -->
+            <div v-if="form.action_module" class="form-group">
+              <label class="form-label" for="notif-action-params">Parâmetros do Módulo (Opcional)</label>
+              <input
+                id="notif-action-params"
+                v-model="form.action_params"
+                type="text"
+                placeholder='Ex: {"tab": "hinos"} ou id de registro'
+                class="form-input font-mono"
+              />
+              <span class="form-hint">Parâmetros opcionais (JSON ou texto) enviados à tela.</span>
+            </div>
+
+            <!-- Link de Ação (URL Web Externa) -->
             <div class="form-group">
-              <label class="form-label" for="notif-link-url">Link de Ação (Opcional)</label>
+              <label class="form-label" for="notif-link-url">Link Externo (URL do Site - Opcional)</label>
               <input
                 id="notif-link-url"
                 v-model="form.link_url"
                 type="url"
-                placeholder="https://exemplo.com/download"
+                placeholder="https://exemplo.com/detalhes"
                 class="form-input font-mono"
               />
+              <span class="form-hint">Abre no navegador externo do sistema operacional.</span>
             </div>
 
-            <!-- Rótulo do Botão -->
+            <!-- Rótulo do Botão de Link Externo -->
             <div class="form-group">
-              <label class="form-label" for="notif-link-label">Texto do Botão de Ação</label>
+              <label class="form-label" for="notif-link-label">Texto do Botão do Link</label>
               <input
                 id="notif-link-label"
                 v-model="form.link_label"
                 type="text"
-                placeholder="Ex: Baixar Atualização / Saiba Mais"
+                placeholder="Ex: Ver Novidades, Saiba Mais"
                 class="form-input"
               />
             </div>
@@ -529,9 +590,21 @@
               </div>
               <h4 class="preview-title">{{ form.title || 'Título da Notificação' }}</h4>
               <p class="preview-body">{{ form.message || 'O texto da mensagem configurado aparecerá aqui para o operador do culto...' }}</p>
-              <div v-if="form.link_url" class="preview-action">
-                <button type="button" class="preview-btn">
-                  {{ form.link_label || 'Acessar Link' }} →
+              
+              <!-- Botões da Prévia (Módulo e Link) -->
+              <div v-if="form.action_module || form.link_url" class="preview-actions-row">
+                <button v-if="form.action_module" type="button" class="preview-btn preview-btn-module">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="preview-btn-icon">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>{{ form.action_label || getModuleDefaultLabel(form.action_module) }}</span>
+                </button>
+
+                <button v-if="form.link_url" type="button" class="preview-btn preview-btn-link">
+                  <span>{{ form.link_label || 'Acessar Link' }}</span>
+                  <span>→</span>
                 </button>
               </div>
             </div>
@@ -610,6 +683,37 @@ const toastType = ref<"success" | "error">("success");
 const isModalOpen = ref(false);
 const editingItem = ref<AppNotification | null>(null);
 
+const MODULE_OPTIONS = [
+  { id: "sync.db_update", name: "Atualização do Banco de Músicas", label: "Atualizar Músicas" },
+  { id: "sync", name: "Biblioteca de Músicas (Sync)", label: "Abrir Músicas" },
+  { id: "bible", name: "Bíblia Sagrada", label: "Abrir Bíblia" },
+  { id: "hymnal", name: "Hinário Adventista", label: "Abrir Hinário" },
+  { id: "hymnal_1996", name: "Hinário Adventista (1996)", label: "Abrir Hinário 1996" },
+  { id: "liturgy", name: "Liturgia do Culto", label: "Ver Liturgia" },
+  { id: "config", name: "Configurações Gerais", label: "Configurações" },
+  { id: "help", name: "Ajuda e Suporte", label: "Central de Ajuda" },
+  { id: "help.support", name: "Abertura de Chamado de Suporte", label: "Abrir Suporte" },
+  { id: "help.manual", name: "Manual do Usuário", label: "Manual do Usuário" },
+  { id: "update", name: "Verificador de Atualizações do App", label: "Verificar Atualizações" },
+  { id: "timer", name: "Cronômetro", label: "Abrir Cronômetro" },
+  { id: "clock", name: "Relógio", label: "Abrir Relógio" },
+  { id: "collections", name: "Coletâneas", label: "Ver Coletâneas" },
+  { id: "custom_collection", name: "Coletâneas Personalizadas", label: "Coletâneas Personalizadas" },
+  { id: "music_editor", name: "Editor de Música", label: "Editor de Músicas" },
+];
+
+function getModuleName(moduleId?: string | null): string {
+  if (!moduleId) return "";
+  const found = MODULE_OPTIONS.find((m) => m.id === moduleId);
+  return found ? found.name : moduleId;
+}
+
+function getModuleDefaultLabel(moduleId?: string | null): string {
+  if (!moduleId) return "Abrir no Louvor JA";
+  const found = MODULE_OPTIONS.find((m) => m.id === moduleId);
+  return found?.label || "Abrir no Louvor JA";
+}
+
 const form = reactive<CreateNotificationInput>({
   title: "",
   message: "",
@@ -618,6 +722,9 @@ const form = reactive<CreateNotificationInput>({
   target_audience: "all",
   link_url: "",
   link_label: "",
+  action_module: null,
+  action_label: "",
+  action_params: "",
   is_active: true,
   expires_at: null,
 });
@@ -628,6 +735,109 @@ const activeCount = computed(() => {
 
 const inactiveCount = computed(() => {
   return notifications.value.filter((n) => !n.is_active).length;
+});
+
+const totalInstallations = computed(() => {
+  return Math.max(1, analytics.value.total_installations || 1);
+});
+
+// Escopo de notificações para os cards analíticos de topo (acompanha o filtro de status selecionado)
+const scopeNotifications = computed(() => {
+  if (statusFilter.value === "active") {
+    return notifications.value.filter((n) => n.is_active);
+  }
+  if (statusFilter.value === "inactive") {
+    return notifications.value.filter((n) => !n.is_active);
+  }
+  return notifications.value;
+});
+
+// Alcance Geral (Visualizações) ponderado sobre as notificações do escopo e instalações
+const globalViewedStats = computed(() => {
+  const list = scopeNotifications.value;
+  const notifCount = list.length;
+  const instCount = totalInstallations.value;
+  const totalOpp = notifCount * instCount;
+
+  if (notifCount === 0 || totalOpp === 0) {
+    return {
+      count: 0,
+      total: 0,
+      pct: 0,
+      fraction: "0/0",
+      foot: statusFilter.value === "inactive"
+        ? "Nenhuma notificação pausada"
+        : statusFilter.value === "active"
+          ? "Nenhuma notificação ativa"
+          : "Nenhuma notificação cadastrada",
+    };
+  }
+
+  const count = list.reduce((sum, n) => sum + (n.viewed_count || 0), 0);
+  const pct = Math.min(100, Math.round((count / totalOpp) * 100));
+
+  let foot = "";
+  const scopeSuffix = statusFilter.value === "inactive" ? "pausadas" : statusFilter.value === "active" ? "ativas" : "todas";
+  if (notifCount === 1) {
+    foot = `${count} de ${instCount} instalação(ões) viram`;
+  } else if (instCount === 1) {
+    foot = `${count} de ${totalOpp} entregas visualizadas (${scopeSuffix})`;
+  } else {
+    const avg = (count / notifCount).toFixed(1).replace(".0", "");
+    foot = `${count} de ${totalOpp} entregas (média de ${avg} de ${instCount} inst.)`;
+  }
+
+  return {
+    count,
+    total: totalOpp,
+    pct,
+    fraction: `${count}/${totalOpp}`,
+    foot,
+  };
+});
+
+// Leituras consolidadas ponderadas sobre as notificações do escopo e instalações
+const globalReadStats = computed(() => {
+  const list = scopeNotifications.value;
+  const notifCount = list.length;
+  const instCount = totalInstallations.value;
+  const totalOpp = notifCount * instCount;
+
+  if (notifCount === 0 || totalOpp === 0) {
+    return {
+      count: 0,
+      total: 0,
+      pct: 0,
+      fraction: "0/0",
+      foot: statusFilter.value === "inactive"
+        ? "Nenhuma notificação pausada"
+        : statusFilter.value === "active"
+          ? "Nenhuma notificação ativa"
+          : "Nenhuma notificação cadastrada",
+    };
+  }
+
+  const count = list.reduce((sum, n) => sum + (n.read_count || 0), 0);
+  const pct = Math.min(100, Math.round((count / totalOpp) * 100));
+
+  let foot = "";
+  const scopeSuffix = statusFilter.value === "inactive" ? "pausadas" : statusFilter.value === "active" ? "ativas" : "todas";
+  if (notifCount === 1) {
+    foot = `${count} de ${instCount} instalação(ões) leram`;
+  } else if (instCount === 1) {
+    foot = `${count} de ${totalOpp} entregas lidas (${scopeSuffix})`;
+  } else {
+    const avg = (count / notifCount).toFixed(1).replace(".0", "");
+    foot = `${count} de ${totalOpp} leituras (média de ${avg} de ${instCount} inst.)`;
+  }
+
+  return {
+    count,
+    total: totalOpp,
+    pct,
+    fraction: `${count}/${totalOpp}`,
+    foot,
+  };
 });
 
 const filteredNotifications = computed(() => {
@@ -707,6 +917,9 @@ function openCreateModal() {
   form.target_audience = "all";
   form.link_url = "";
   form.link_label = "";
+  form.action_module = null;
+  form.action_label = "";
+  form.action_params = "";
   form.is_active = true;
   form.expires_at = null;
   isModalOpen.value = true;
@@ -721,6 +934,9 @@ function openEditModal(item: AppNotification) {
   form.target_audience = item.target_audience;
   form.link_url = item.link_url || "";
   form.link_label = item.link_label || "";
+  form.action_module = item.action_module || null;
+  form.action_label = item.action_label || "";
+  form.action_params = item.action_params || "";
   form.is_active = item.is_active;
   form.expires_at = item.expires_at || null;
   isModalOpen.value = true;
@@ -1345,8 +1561,30 @@ onMounted(() => {
   white-space: pre-line;
 }
 
-.notif-action-link-wrap {
+.notif-actions-wrap {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.action-module-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+}
+
+.action-chip-svg {
+  width: 13px;
+  height: 13px;
 }
 
 .action-link-btn {
@@ -1761,19 +1999,40 @@ onMounted(() => {
   margin: 0;
 }
 
-.preview-action {
-  margin-top: 4px;
+.preview-actions-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .preview-btn {
-  background: var(--primary-light);
-  color: var(--primary);
   border: none;
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.2;
+}
+
+.preview-btn-module {
+  background: #a855f7;
+  color: #ffffff;
+}
+
+.preview-btn-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.preview-btn-link {
+  background: var(--primary-light);
+  color: var(--primary);
 }
 
 /* Modal Actions */

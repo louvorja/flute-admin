@@ -2,7 +2,7 @@
   <div class="card-box mini-widget-card">
     <div class="card-header">
       <div>
-        <h4 class="card-title">Saúde do Sistema</h4>
+        <h4 class="card-title">Saúde do Programa</h4>
         <span class="card-sub">Estabilidade operacional</span>
       </div>
       <span class="period-tag font-mono">{{ periodLabel }}</span>
@@ -10,11 +10,11 @@
 
     <!-- Valor de Destaque -->
     <div class="highlight-val font-mono">{{ stabilityRate }}%</div>
-    <div class="growth-label" :class="(errorCount || 0) === 0 ? 'text-success' : 'text-danger'">
+    <div class="growth-label" :class="healthStatus.textColor">
       {{ (errorCount || 0) === 0 ? '↗ 100% cultos sem falhas' : `↘ ${errorCount} falha(s) registrada(s)` }}
     </div>
 
-    <!-- Gauge Semi-Circular SVG (como o 75% da imagem) -->
+    <!-- Gauge Semi-Circular SVG -->
     <div class="gauge-wrap">
       <svg viewBox="0 0 160 90" class="gauge-svg">
         <!-- Arco Base de Fundo -->
@@ -25,7 +25,7 @@
           stroke-width="16"
           stroke-linecap="round"
         />
-        <!-- Arco Ativo Verde Vibrante -->
+        <!-- Arco Ativo com Cor Semântica Real -->
         <path
           d="M 15 80 A 65 65 0 0 1 145 80"
           fill="none"
@@ -38,15 +38,14 @@
         />
         <defs>
           <linearGradient id="healthGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#fde047" />
-            <stop offset="40%" stop-color="#4ade80" />
-            <stop offset="100%" stop-color="#16a34a" />
+            <stop offset="0%" :stop-color="healthStatus.stop1" />
+            <stop offset="100%" :stop-color="healthStatus.stop2" />
           </linearGradient>
         </defs>
       </svg>
       <div class="gauge-inner-val font-mono">
         <span class="gauge-percent">{{ stabilityRate }}%</span>
-        <span class="gauge-sub">{{ (errorCount || 0) === 0 ? 'Operação Normal' : 'Atenção Requerida' }}</span>
+        <span class="gauge-sub" :class="healthStatus.textColor">{{ healthStatus.label }}</span>
       </div>
     </div>
 
@@ -89,6 +88,31 @@ const dashOffset = computed(() => {
   // Arco completo tem 204 unidades. Offset proporcional.
   const p = (100 - stabilityRate.value) / 100;
   return Math.round(204 * p);
+});
+
+const healthStatus = computed(() => {
+  if ((props.errorCount || 0) === 0 || stabilityRate.value >= 98) {
+    return {
+      stop1: "#34d399",
+      stop2: "#10b981",
+      textColor: "text-success",
+      label: "Operação Normal",
+    };
+  }
+  if (stabilityRate.value >= 80) {
+    return {
+      stop1: "#fde047",
+      stop2: "#f59e0b",
+      textColor: "text-warning",
+      label: "Atenção Requerida",
+    };
+  }
+  return {
+    stop1: "#f87171",
+    stop2: "#ef4444",
+    textColor: "text-danger",
+    label: "Falhas Críticas",
+  };
 });
 </script>
 
@@ -143,6 +167,14 @@ const dashOffset = computed(() => {
 
 .text-success {
   color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
+.text-danger {
+  color: var(--danger);
 }
 
 /* Gauge Semi Circular */

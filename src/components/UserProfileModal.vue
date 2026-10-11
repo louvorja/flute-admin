@@ -137,7 +137,7 @@
             />
           </div>
           <span class="hint-msg">
-            O novo e-mail será atualizado diretamente para seu acesso ao painel administrativo.
+            O novo e-mail será atualizado diretamente para seu acesso ao painel.
           </span>
         </div>
 

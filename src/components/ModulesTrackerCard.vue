@@ -2,7 +2,7 @@
   <div class="card-box mini-widget-card">
     <div class="card-header">
       <div>
-        <h4 class="card-title">Módulos do Sistema</h4>
+        <h4 class="card-title">Módulos do Programa</h4>
         <span class="card-sub">Recursos mais executados</span>
       </div>
       <button class="add-goal-btn" @click="$emit('view-all')">
