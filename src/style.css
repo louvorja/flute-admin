@@ -1,0 +1,182 @@
+/* ==========================================================================
+   Louvor JA Admin - Design System Moderno (Inspirado no Dashboard SaaS)
+   Suporte a Modo Claro e Modo Escuro
+   ========================================================================== */
+
+:root {
+  /* Cores de Fundo e Superfície (Modo Claro) */
+  --bg-app: #f4f5f9;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f9fafb;
+  --bg-card-hover: #f8fafc;
+  
+  /* Trilhos de Barra / Gráficos */
+  --track-bg: #f1f3f9;
+  
+  /* Bordas e Linhas */
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-focus: #0097d7;
+  
+  /* Cores de Destaque Louvor JA */
+  --primary: #0097d7;
+  --primary-hover: #0084bd;
+  --primary-light: #e6f5fc;
+  --primary-gradient: linear-gradient(135deg, #0097d7 0%, #006b99 100%);
+  --brand-card-gradient: linear-gradient(135deg, #0c1a2e 0%, #0a2540 50%, #0077b3 100%);
+
+  /* Cores Semânticas */
+  --success: #10b981;
+  --success-light: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-light: #fffbeb;
+  --danger: #ef4444;
+  --danger-light: #fef2f2;
+  --info: #3b82f6;
+  --info-light: #eff6ff;
+  --purple: #8b5cf6;
+  --purple-light: #f5f3ff;
+
+  /* Tipografia & Textos */
+  --text-main: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+  
+  --font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Sombras Modernas e Suaves */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-pill: 0 2px 6px rgba(0, 0, 0, 0.06);
+
+  /* Raios de Arredondamento */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Dimensões */
+  --sidebar-width: 264px;
+  --sidebar-collapsed-width: 80px;
+}
+
+/* ==========================================================================
+   Modo Escuro (Dark Mode)
+   ========================================================================== */
+html.dark,
+body.dark,
+.dark {
+  /* Cores de Fundo e Superfície */
+  --bg-app: #0b0e14;
+  --bg-card: #151922;
+  --bg-card-subtle: #1c2230;
+  --bg-card-hover: #222a3b;
+  
+  /* Trilhos de Barra / Gráficos */
+  --track-bg: #1f2737;
+  
+  /* Bordas e Linhas */
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-focus: #0097d7;
+
+  /* Cores Semânticas no Dark */
+  --primary-light: rgba(0, 151, 215, 0.16);
+  --success-light: rgba(16, 185, 129, 0.16);
+  --warning-light: rgba(245, 158, 11, 0.16);
+  --danger-light: rgba(239, 68, 68, 0.16);
+  --info-light: rgba(59, 130, 246, 0.16);
+  --purple-light: rgba(139, 92, 246, 0.16);
+
+  /* Tipografia & Textos */
+  --text-main: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+
+  /* Sombras Modernas no Dark */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-pill: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Força background escuro no html e body sem depender de herança de variáveis */
+html.dark,
+html.dark body,
+html.dark #app {
+  background-color: #0b0e14 !important;
+  color: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Garante que o body herde as variáveis do dark sem precisar de classe própria */
+html.dark body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+}
+
+/* Scrollbar Elegante */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-light);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Card Padrão do Dashboard */
+.card-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.card-box:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Botões Globais */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+}
