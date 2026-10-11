@@ -14,23 +14,18 @@ Site administrativo próprio para acompanhamento em tempo real do uso do **Louvo
 
 ## Como rodar o site localmente:
 
-1. Acesse esta pasta:
-   ```bash
-   cd admin
-   ```
-
-2. Instale as dependências (se necessário):
+1. Instale as dependências (se necessário):
    ```bash
    npm install
    ```
 
-3. Inicie o servidor de desenvolvimento:
+2. Inicie o servidor de desenvolvimento:
    ```bash
    npm run dev
    ```
    O painel estará disponível em `http://localhost:3333`.
 
-4. Para gerar a build de produção:
+3. Para gerar a build de produção:
    ```bash
    npm run build
    ```
