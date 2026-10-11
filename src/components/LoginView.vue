@@ -10,37 +10,37 @@
         </div>
         <div class="header-texts">
           <h1 class="login-title">Louvor JA Flute</h1>
-          <p class="login-sub">Painel de Telemetria & Suporte</p>
+          <p class="login-sub">Painel de Telemetria & Gestão</p>
         </div>
       </div>
 
-      <!-- Formulário de Autenticação -->
-      <form class="login-form" @submit.prevent="handleSubmit">
-        <!-- Alerta de Erro -->
-        <div v-if="errorMessage" class="error-alert">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span>{{ errorMessage }}</span>
-        </div>
+      <!-- Alertas de Erro -->
+      <div v-if="errorMessage" class="feedback-alert error-alert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ errorMessage }}</span>
+      </div>
 
-        <!-- Campo: E-mail -->
+      <!-- Formulário de Login Administrativo -->
+      <form class="login-form" @submit.prevent="handleLogin">
+        <!-- Campo: E-mail ou Nome de Usuário -->
         <div class="form-group">
-          <label class="form-label" for="login-email">E-mail</label>
+          <label class="form-label" for="login-identifier">E-mail ou Nome de Usuário</label>
           <div class="input-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="input-icon">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
             </svg>
             <input
-              id="login-email"
-              v-model="email"
-              type="email"
+              id="login-identifier"
+              v-model="loginIdentifier"
+              type="text"
               required
-              autocomplete="email"
-              placeholder="admin@louvorja.org"
+              autocomplete="username"
+              placeholder="usuario ou seu@email.com"
               class="form-input font-mono"
               :disabled="loading"
             />
@@ -49,7 +49,7 @@
 
         <!-- Campo: Senha -->
         <div class="form-group">
-          <label class="form-label" for="login-password">Senha</label>
+          <label class="form-label" for="login-password">Senha de Acesso</label>
           <div class="input-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="input-icon">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -57,7 +57,7 @@
             </svg>
             <input
               id="login-password"
-              v-model="password"
+              v-model="loginPassword"
               :type="showPassword ? 'text' : 'password'"
               required
               autocomplete="current-password"
@@ -106,9 +106,7 @@
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <span>
-          Acesso restrito à equipe técnica. Novos usuários são adicionados diretamente no banco de dados.
-        </span>
+        <span>Acesso restrito à equipe técnica e administradores autorizados.</span>
       </div>
     </div>
   </div>
@@ -116,21 +114,23 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { signInWithEmail } from "../services/supabase";
+import { signInWithIdentifier } from "../services/supabase";
 
 const emit = defineEmits<{
   (e: "login-success"): void;
 }>();
 
-const email = ref("");
-const password = ref("");
 const showPassword = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
 
-async function handleSubmit() {
-  if (!email.value || !password.value) {
-    errorMessage.value = "Informe seu e-mail e senha de acesso.";
+// Login state
+const loginIdentifier = ref("");
+const loginPassword = ref("");
+
+async function handleLogin() {
+  if (!loginIdentifier.value || !loginPassword.value) {
+    errorMessage.value = "Informe seu e-mail ou nome de usuário e sua senha.";
     return;
   }
 
@@ -138,11 +138,11 @@ async function handleSubmit() {
   errorMessage.value = "";
 
   try {
-    const res = await signInWithEmail(email.value, password.value);
+    const res = await signInWithIdentifier(loginIdentifier.value, loginPassword.value);
     if (res.success) {
       emit("login-success");
     } else {
-      errorMessage.value = res.error || "E-mail ou senha incorretos.";
+      errorMessage.value = res.error || "E-mail/usuário ou senha incorretos.";
     }
   } catch (err: any) {
     errorMessage.value = err.message || "Erro inesperado ao conectar ao servidor.";
@@ -381,5 +381,31 @@ async function handleSubmit() {
   height: 16px;
   color: var(--text-light);
   flex-shrink: 0;
+}
+
+/* Alertas de Feedback */
+.feedback-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.error-alert {
+  background: var(--danger-light);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--danger);
+}
+
+.field-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.3;
 }
 </style>

@@ -79,7 +79,9 @@
           </div>
           <div class="profile-info">
             <span class="profile-name">{{ userName || 'Administrador' }}</span>
-            <span class="profile-role font-mono" :title="userEmail">{{ userEmail || 'admin@louvorja.org' }}</span>
+            <span class="profile-role font-mono" :title="userEmail">
+              {{ userUsername ? `@${userUsername}` : (userEmail || 'admin@louvorja.org') }}
+            </span>
           </div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pill-gear-icon">
             <circle cx="12" cy="12" r="3"/>
@@ -107,6 +109,7 @@ const props = defineProps<{
   isDark?: boolean;
   userEmail?: string;
   userName?: string;
+  userUsername?: string;
 }>();
 
 defineEmits<{
@@ -124,6 +127,9 @@ const avatarInitials = computed(() => {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return props.userName.slice(0, 2).toUpperCase();
+  }
+  if (props.userUsername) {
+    return props.userUsername.slice(0, 2).toUpperCase();
   }
   if (props.userEmail) {
     const namePart = props.userEmail.split("@")[0];

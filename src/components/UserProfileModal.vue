@@ -9,7 +9,10 @@
           </div>
           <div>
             <h3 class="modal-title">{{ currentName || 'Administrador Louvor JA' }}</h3>
-            <p class="modal-subtitle font-mono">{{ currentEmail }}</p>
+            <p class="modal-subtitle font-mono">
+              <span v-if="currentUsername" class="user-handle-badge">@{{ currentUsername }}</span>
+              <span>{{ currentEmail }}</span>
+            </p>
           </div>
         </div>
 
@@ -77,6 +80,7 @@
 
       <!-- Conteúdo da Aba: DADOS GERAIS -->
       <form v-if="activeTab === 'general'" class="tab-content" @submit.prevent="handleSaveGeneral">
+        <!-- Campo: Nome Completo -->
         <div class="form-group">
           <label class="form-label" for="profile-name">Nome do Administrador</label>
           <div class="input-wrap">
@@ -94,6 +98,27 @@
           </div>
         </div>
 
+        <!-- Campo: Nome de Usuário -->
+        <div class="form-group">
+          <label class="form-label" for="profile-username">Nome de Usuário (Username)</label>
+          <div class="input-wrap">
+            <span class="user-at-symbol font-mono">@</span>
+            <input
+              id="profile-username"
+              v-model="formUsername"
+              type="text"
+              placeholder="usuario"
+              class="form-input font-mono"
+              :disabled="saving"
+              @input="formatUsernameInput"
+            />
+          </div>
+          <span class="hint-msg">
+            Identificador exclusivo para login rápido no painel.
+          </span>
+        </div>
+
+        <!-- Campo: E-mail -->
         <div class="form-group">
           <label class="form-label" for="profile-email">E-mail</label>
           <div class="input-wrap">
@@ -112,7 +137,7 @@
             />
           </div>
           <span class="hint-msg">
-            Nota: Caso a confirmação por e-mail esteja ativada no serviço em nuvem, uma mensagem de validação será enviada.
+            O novo e-mail será atualizado diretamente para seu acesso ao painel administrativo.
           </span>
         </div>
 
@@ -204,6 +229,10 @@
       <div v-else-if="activeTab === 'account'" class="tab-content">
         <div class="account-details-grid font-mono">
           <div class="account-row">
+            <span class="row-label">Nome de Usuário:</span>
+            <span class="row-val font-mono highlight-user">@{{ currentUsername || 'N/A' }}</span>
+          </div>
+          <div class="account-row">
             <span class="row-label">ID de Usuário (UUID):</span>
             <span class="row-val ellipsis-text" :title="profile?.id">{{ profile?.id || 'N/A' }}</span>
           </div>
@@ -264,6 +293,7 @@ const activeTab = ref<"general" | "security" | "account">("general");
 
 const profile = ref<UserProfile | null>(props.userProfile || null);
 const formName = ref("");
+const formUsername = ref("");
 const formEmail = ref("");
 
 const newPassword = ref("");
@@ -275,7 +305,12 @@ const alertMessage = ref("");
 const alertType = ref<"success" | "error">("success");
 
 const currentName = computed(() => profile.value?.name || formName.value);
+const currentUsername = computed(() => profile.value?.username || formUsername.value);
 const currentEmail = computed(() => profile.value?.email || formEmail.value);
+
+function formatUsernameInput() {
+  formUsername.value = formUsername.value.toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+}
 
 const avatarInitials = computed(() => {
   if (currentName.value) {
@@ -284,6 +319,9 @@ const avatarInitials = computed(() => {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return currentName.value.slice(0, 2).toUpperCase();
+  }
+  if (currentUsername.value) {
+    return currentUsername.value.slice(0, 2).toUpperCase();
   }
   if (currentEmail.value) {
     return currentEmail.value.slice(0, 2).toUpperCase();
@@ -308,9 +346,12 @@ async function handleSaveGeneral() {
   saving.value = true;
   alertMessage.value = "";
 
-  const payload: { name?: string; email?: string } = {};
+  const payload: { name?: string; username?: string; email?: string } = {};
   if (formName.value.trim() !== (profile.value?.name || "")) {
     payload.name = formName.value.trim();
+  }
+  if (formUsername.value.trim() !== (profile.value?.username || "")) {
+    payload.username = formUsername.value.trim();
   }
   if (formEmail.value.trim() !== (profile.value?.email || "")) {
     payload.email = formEmail.value.trim();
@@ -385,6 +426,7 @@ onMounted(async () => {
   }
   if (profile.value) {
     formName.value = profile.value.name || "";
+    formUsername.value = profile.value.username || "";
     formEmail.value = profile.value.email || "";
   }
 });
@@ -785,5 +827,29 @@ onMounted(async () => {
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.user-handle-badge {
+  display: inline-block;
+  font-size: 0.74rem;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-right: 6px;
+  font-weight: 700;
+}
+
+.user-at-symbol {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.highlight-user {
+  color: var(--primary);
+  font-weight: 700;
 }
 </style>

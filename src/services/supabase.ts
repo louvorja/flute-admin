@@ -147,6 +147,7 @@ export interface UserProfile {
   id: string;
   email: string;
   name?: string;
+  username?: string;
   role?: string;
   created_at?: string;
   last_sign_in_at?: string;
@@ -184,7 +185,83 @@ export function isAuthenticated(): boolean {
   return Boolean(getAuthToken());
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Busca perfil na tabela admin_profiles pelo nome de usuário
+ */
+export async function findProfileByUsername(username: string): Promise<{ id: string; username: string; email: string; name?: string } | null> {
+  const clean = username.trim().toLowerCase().replace(/^@/, "");
+  if (!clean) return null;
+  try {
+    const list = await fetchFromSupabase(`admin_profiles?username=ilike.${encodeURIComponent(clean)}&limit=1`);
+    if (Array.isArray(list) && list.length > 0) {
+      return list[0];
+    }
+    return null;
+  } catch (err) {
+    console.warn("Falha ao buscar perfil por username:", err);
+    return null;
+  }
+}
+
+/**
+ * Valida se um nome de usuário está disponível para cadastro
+ */
+export async function checkUsernameAvailable(username: string, excludeUserId?: string): Promise<{ available: boolean; error?: string }> {
+  const clean = username.trim().toLowerCase().replace(/^@/, "");
+  if (!clean) {
+    return { available: false, error: "Informe um nome de usuário." };
+  }
+  if (!/^[a-z0-9_.-]{3,30}$/.test(clean)) {
+    return {
+      available: false,
+      error: "O nome de usuário deve ter entre 3 e 30 caracteres (letras minúsculas, números, '.', '-' ou '_').",
+    };
+  }
+
+  try {
+    let endpoint = `admin_profiles?username=ilike.${encodeURIComponent(clean)}`;
+    if (excludeUserId) {
+      endpoint += `&id=neq.${encodeURIComponent(excludeUserId)}`;
+    }
+    const list = await fetchFromSupabase(`${endpoint}&limit=1`);
+    if (Array.isArray(list) && list.length > 0) {
+      return { available: false, error: `O nome de usuário '@${clean}' já está em uso.` };
+    }
+    return { available: true };
+  } catch {
+    return { available: true };
+  }
+}
+
+/**
+ * Login flexível aceitando tanto E-mail quanto Nome de Usuário
+ */
+export async function signInWithIdentifier(
+  identifier: string,
+  password: string
+): Promise<{ success: boolean; error?: string; user?: UserProfile }> {
+  const clean = identifier.trim();
+  if (!clean) {
+    return { success: false, error: "Informe seu e-mail ou nome de usuário." };
+  }
+  if (!password) {
+    return { success: false, error: "Informe sua senha de acesso." };
+  }
+
+  let emailToUse = clean;
+
+  // Se NÃO for um e-mail com @, busca o e-mail correspondente pelo username
+  if (!clean.includes("@")) {
+    const profile = await findProfileByUsername(clean);
+    if (!profile) {
+      return {
+        success: false,
+        error: `Nenhum usuário encontrado com o nome de usuário '@${clean.replace(/^@/, "")}'. Verifique a digitação ou use seu e-mail.`,
+      };
+    }
+    emailToUse = profile.email;
+  }
+
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
@@ -192,41 +269,211 @@ export async function signInWithEmail(email: string, password: string): Promise<
         apikey: SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email: email.trim(), password }),
+      body: JSON.stringify({ email: emailToUse.trim(), password }),
     });
 
     const data = await res.json();
     if (!res.ok || data.error) {
-      const msg = data.error_description || data.msg || data.message || "E-mail ou senha incorretos";
+      const msg = data.error_description || data.msg || data.message || "E-mail/usuário ou senha incorretos.";
       return { success: false, error: msg };
     }
 
     if (data.access_token) {
-      const name = data.user?.user_metadata?.name || data.user?.raw_user_meta_data?.name || "";
+      const userMeta = data.user?.user_metadata || data.user?.raw_user_meta_data || {};
+      let name = userMeta.name || "";
+      let username = userMeta.username || (!clean.includes("@") ? clean.replace(/^@/, "").toLowerCase() : "");
+
+      // Busca na tabela admin_profiles para garantir username consistente
+      if (data.user?.id) {
+        try {
+          const list = await fetchFromSupabase(`admin_profiles?id=eq.${encodeURIComponent(data.user.id)}&limit=1`);
+          if (Array.isArray(list) && list.length > 0) {
+            username = list[0].username || username;
+            if (!name && list[0].name) name = list[0].name;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!username && data.user?.email) {
+        username = data.user.email.split("@")[0].toLowerCase();
+      }
+
+      const userProfile: UserProfile = {
+        id: data.user?.id || "",
+        email: data.user?.email || emailToUse,
+        name,
+        username,
+        role: data.user?.role,
+        created_at: data.user?.created_at,
+        last_sign_in_at: data.user?.last_sign_in_at,
+      };
+
       const session: AuthSession = {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
-        user: {
-          id: data.user?.id || "",
-          email: data.user?.email || email,
-          name,
-          role: data.user?.role,
-          created_at: data.user?.created_at,
-          last_sign_in_at: data.user?.last_sign_in_at,
-        },
+        user: userProfile,
       };
       localStorage.setItem(STORAGE_AUTH_SESSION, JSON.stringify(session));
-      return { success: true };
+
+      return { success: true, user: userProfile };
     }
 
-    return { success: false, error: "Resposta inválida do servidor de autenticação" };
+    return { success: false, error: "Resposta inesperada do servidor de autenticação." };
   } catch (err: any) {
-    return { success: false, error: err.message || "Falha de rede ao conectar ao Supabase" };
+    return { success: false, error: err.message || "Falha de rede ao conectar com o serviço de autenticação." };
+  }
+}
+
+/** Alias para manter compatibilidade com código existente */
+export const signInWithEmail = signInWithIdentifier;
+
+/**
+ * Criação de nova conta de administrador (Sign Up com Nome, Usuário, E-mail e Senha)
+ */
+export async function signUpUser(input: {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+}): Promise<{
+  success: boolean;
+  autoLogin?: boolean;
+  message?: string;
+  error?: string;
+  user?: UserProfile;
+}> {
+  const cleanName = input.name.trim();
+  const cleanUsername = input.username.trim().toLowerCase().replace(/^@/, "");
+  const cleanEmail = input.email.trim().toLowerCase();
+  const password = input.password;
+
+  if (!cleanName) {
+    return { success: false, error: "Informe seu nome completo." };
+  }
+  if (!cleanUsername) {
+    return { success: false, error: "Informe um nome de usuário." };
+  }
+  if (!cleanEmail || !cleanEmail.includes("@")) {
+    return { success: false, error: "Informe um e-mail válido." };
+  }
+  if (!password || password.length < 6) {
+    return { success: false, error: "A senha deve ter no mínimo 6 caracteres." };
+  }
+
+  // 1. Verifica disponibilidade do username
+  const checkUsername = await checkUsernameAvailable(cleanUsername);
+  if (!checkUsername.available) {
+    return { success: false, error: checkUsername.error || "Nome de usuário já em uso." };
+  }
+
+  // 2. Verifica se o e-mail já existe
+  try {
+    const existingEmail = await fetchFromSupabase(`admin_profiles?email=eq.${encodeURIComponent(cleanEmail)}&limit=1`);
+    if (Array.isArray(existingEmail) && existingEmail.length > 0) {
+      return { success: false, error: "Este e-mail já está cadastrado no sistema. Faça login diretamente." };
+    }
+  } catch {
+    // continue
+  }
+
+  // 3. Cadastra no Supabase Auth
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password,
+        data: {
+          name: cleanName,
+          username: cleanUsername,
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      const msg = data.error_description || data.msg || data.message || "Erro ao criar usuário.";
+      return { success: false, error: msg };
+    }
+
+    const userId = data.id || data.user?.id;
+
+    // 4. Grava em admin_profiles
+    if (userId) {
+      try {
+        await fetchFromSupabase("admin_profiles", {
+          method: "POST",
+          headers: {
+            Prefer: "resolution=merge-duplicates",
+          },
+          body: JSON.stringify({
+            id: userId,
+            username: cleanUsername,
+            name: cleanName,
+            email: cleanEmail,
+          }),
+        });
+      } catch (err) {
+        console.warn("Falha ao gravar admin_profiles:", err);
+      }
+    }
+
+    // Se já autenticou direto
+    if (data.access_token) {
+      const userProfile: UserProfile = {
+        id: userId,
+        email: cleanEmail,
+        name: cleanName,
+        username: cleanUsername,
+        role: data.user?.role || "authenticated",
+        created_at: data.user?.created_at,
+        last_sign_in_at: data.user?.last_sign_in_at,
+      };
+
+      const session: AuthSession = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        user: userProfile,
+      };
+      localStorage.setItem(STORAGE_AUTH_SESSION, JSON.stringify(session));
+
+      return {
+        success: true,
+        autoLogin: true,
+        user: userProfile,
+        message: "Conta criada e conectada com sucesso!",
+      };
+    }
+
+    // Tenta login com a senha recém criada
+    const loginAttempt = await signInWithIdentifier(cleanEmail, password);
+    if (loginAttempt.success) {
+      return {
+        success: true,
+        autoLogin: true,
+        user: loginAttempt.user,
+        message: "Conta criada com sucesso!",
+      };
+    }
+
+    return {
+      success: true,
+      autoLogin: false,
+      message: "Conta criada com sucesso! Você já pode entrar com seu usuário ou e-mail.",
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Falha ao conectar com o serviço de autenticação." };
   }
 }
 
 /**
- * Busca o perfil atualizado do usuário autenticado diretamente da API do Supabase Auth
+ * Busca o perfil atualizado do usuário autenticado diretamente da API do Supabase Auth e admin_profiles
  */
 export async function fetchUserProfile(): Promise<UserProfile | null> {
   try {
@@ -243,11 +490,32 @@ export async function fetchUserProfile(): Promise<UserProfile | null> {
     if (!res.ok) return getCurrentUser();
 
     const data = await res.json();
-    const name = data.user_metadata?.name || data.raw_user_meta_data?.name || "";
+    let name = data.user_metadata?.name || data.raw_user_meta_data?.name || "";
+    let username = data.user_metadata?.username || data.raw_user_meta_data?.username || "";
+    let email = data.email || "";
+
+    if (data.id) {
+      try {
+        const list = await fetchFromSupabase(`admin_profiles?id=eq.${encodeURIComponent(data.id)}&limit=1`);
+        if (Array.isArray(list) && list.length > 0) {
+          username = list[0].username || username;
+          if (list[0].name) name = list[0].name;
+          if (list[0].email) email = list[0].email;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!username && email) {
+      username = email.split("@")[0].toLowerCase();
+    }
+
     const updatedProfile: UserProfile = {
       id: data.id,
-      email: data.email,
+      email,
       name,
+      username,
       role: data.role,
       created_at: data.created_at,
       last_sign_in_at: data.last_sign_in_at,
@@ -267,66 +535,110 @@ export async function fetchUserProfile(): Promise<UserProfile | null> {
 }
 
 /**
- * Atualiza os dados cadastrais (nome, email, senha) do usuário autenticado
+ * Atualiza os dados cadastrais (nome, username, email, senha) do usuário autenticado
  */
 export async function updateUserProfile(payload: {
   name?: string;
+  username?: string;
   email?: string;
   password?: string;
 }): Promise<{ success: boolean; user?: UserProfile; message?: string; error?: string }> {
   try {
     const token = getAuthToken();
-    if (!token) return { success: false, error: "Usuário não autenticado." };
+    const currentUser = getCurrentUser();
+    if (!token || !currentUser) return { success: false, error: "Usuário não autenticado." };
 
-    const body: Record<string, any> = {};
-    if (payload.name !== undefined) {
-      body.data = { name: payload.name.trim() };
+    const targetName = payload.name !== undefined ? payload.name.trim() : currentUser.name;
+    const targetEmail = payload.email !== undefined ? payload.email.trim().toLowerCase() : currentUser.email;
+    let targetUsername = currentUser.username;
+
+    if (payload.username !== undefined) {
+      const cleanUser = payload.username.trim().toLowerCase().replace(/^@/, "");
+      if (cleanUser) {
+        targetUsername = cleanUser;
+      }
     }
-    if (payload.email) {
-      body.email = payload.email.trim();
+
+    let updatedProfileData = {
+      id: currentUser.id,
+      name: targetName,
+      username: targetUsername,
+      email: targetEmail,
+    };
+
+    const hasProfileChanges =
+      payload.name !== undefined ||
+      payload.username !== undefined ||
+      payload.email !== undefined;
+
+    // 1. Atualiza dados de perfil (nome, username, e-mail) através da RPC segura no banco de dados
+    if (hasProfileChanges) {
+      try {
+        const rpcResult = await fetchFromSupabase("rpc/update_admin_profile", {
+          method: "POST",
+          body: JSON.stringify({
+            new_name: targetName,
+            new_username: targetUsername,
+            new_email: targetEmail,
+          }),
+        });
+
+        if (rpcResult && typeof rpcResult === "object") {
+          updatedProfileData = {
+            id: rpcResult.id || currentUser.id,
+            name: rpcResult.name || targetName,
+            username: rpcResult.username || targetUsername,
+            email: rpcResult.email || targetEmail,
+          };
+        }
+      } catch (err: any) {
+        return {
+          success: false,
+          error: err.message || "Falha ao atualizar dados de perfil no servidor.",
+        };
+      }
     }
+
+    // 2. Se foi solicitada alteração de senha
     if (payload.password) {
-      body.password = payload.password;
+      const pwRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: payload.password }),
+      });
+
+      const pwData = await pwRes.json();
+      if (!pwRes.ok || pwData.error) {
+        const msg = pwData.error_description || pwData.msg || pwData.message || "Falha ao atualizar a senha.";
+        return { success: false, error: msg };
+      }
     }
 
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: "PUT",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      const msg = data.error_description || data.msg || data.message || "Falha ao atualizar perfil";
-      return { success: false, error: msg };
-    }
-
-    // Atualiza a sessão salva localmente
+    // 3. Atualiza a sessão e o storage local
     const session = getStoredSession();
     if (session) {
-      const updatedProfile: UserProfile = {
+      const updatedUser: UserProfile = {
         ...session.user,
-        email: data.email || session.user.email,
-        name: data.user_metadata?.name ?? payload.name ?? session.user.name,
+        name: updatedProfileData.name,
+        username: updatedProfileData.username,
+        email: updatedProfileData.email,
       };
-      session.user = updatedProfile;
+      session.user = updatedUser;
       localStorage.setItem(STORAGE_AUTH_SESSION, JSON.stringify(session));
       return {
         success: true,
-        user: updatedProfile,
-        message: data.new_email
-          ? `Perfil atualizado! Um e-mail de confirmação foi enviado para ${data.new_email}.`
-          : "Dados de usuário atualizados com sucesso!",
+        user: updatedUser,
+        message: "Dados atualizados com sucesso!",
       };
     }
 
     return { success: true, message: "Dados atualizados com sucesso!" };
   } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao conectar com o serviço de autenticação." };
+    return { success: false, error: err.message || "Erro inesperado ao salvar perfil." };
   }
 }
 
@@ -350,14 +662,22 @@ export async function fetchFromSupabase(endpoint: string, options: RequestInit =
 
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
-    // Se for 401 Unauthorized e tínhamos sessão, limpa a sessão expirada
     if (res.status === 401 && token) {
       signOut();
     }
-    throw new Error(`Supabase query failed: ${res.statusText} (${res.status})`);
+    let detail = "";
+    try {
+      const errData = await res.json();
+      detail = errData.message || errData.error_description || errData.error || errData.msg || errData.hint || "";
+    } catch {
+      try {
+        detail = await res.text();
+      } catch {}
+    }
+    throw new Error(detail || `Supabase query failed: ${res.statusText} (${res.status})`);
   }
 
-  // Se o servidor retornar 204 No Content ou corpo vazio (comum em PATCH/DELETE com return=minimal)
+  // Se o servidor retornar 204 No Content ou corpo vazio
   if (res.status === 204) {
     return null;
   }

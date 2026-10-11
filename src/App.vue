@@ -23,6 +23,7 @@
           :is-dark="isDark"
           :user-email="currentUser?.email"
           :user-name="currentUser?.name"
+          :user-username="currentUser?.username"
           @toggle-mobile-menu="isMobileMenuOpen = !isMobileMenuOpen"
           @refresh="handleRefresh"
           @toggle-theme="toggleTheme"
